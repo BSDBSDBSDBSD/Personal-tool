@@ -18,6 +18,8 @@ data class Command(
     val percent: Boolean = false,
     val settingsPage: SettingsPage? = null,
     val runnerUp: String = "",
+    /** For message_send: "whatsapp" or "sms". */
+    val channel: String? = null,
 )
 
 /** Turns a sentence into a [Command]: classifier picks the intent, rules pull out the details. */
@@ -45,16 +47,7 @@ class Understanding(private val classifier: IntentClassifier) {
             }
             "call_contact" -> base.copy(query = strip(tokens, CALL_LEAD, TRAIL + CALL_TRAIL))
             "note_add" -> {
-                val rest = stripTokens(tokens, NOTE_LEAD, TRAIL).toMutableList()
-                if (rest.isNotEmpty()) {
-                    val f = rest[0]
-                    if (f.norm == "ש") rest.removeAt(0)
-                    else if (f.norm.length > 2 && f.norm[0] == 'ש') {
-                        val tail = f.norm.substring(1)
-                        if (tail[0] == 'ה' || tail in SHE_WORDS) rest[0] = Token(f.display.substring(1), tail)
-                    }
-                }
-                base.copy(query = join(rest))
+                base.copy(query = join(stripShe(stripTokens(tokens, NOTE_LEAD, TRAIL))))
             }
             "note_list" -> {
                 val about = tokens.indexOfFirst { it.norm == n("על") }
@@ -73,6 +66,21 @@ class Understanding(private val classifier: IntentClassifier) {
                 base.copy(number = num, percent = pct)
             }
             "open_settings" -> base.copy(settingsPage = settingsPage(text))
+            "message_send" -> {
+                val whatsapp = tokens.any { t -> HebrewText.cores(t.norm).any { it.second in WHATSAPP } }
+                val kept = tokens.filterNot { t ->
+                    HebrewText.cores(t.norm).any { it.second in WHATSAPP } || t.norm in SMS_WORDS
+                }
+                base.copy(query = strip(kept, MSG_LEAD, TRAIL), channel = if (whatsapp) "whatsapp" else "sms")
+            }
+            "calendar_add" -> {
+                val tr = TimeParser.parseTokens(tokens, now)
+                val remaining = tokens.filterIndexed { i, _ -> i !in tr.consumed }
+                base.copy(time = tr, query = strip(remaining, CAL_LEAD, TRAIL + CAL_LEAD))
+            }
+            "notif_read" -> base.copy(query = strip(tokens, NOTIF_LEAD, TRAIL + NOTIF_LEAD))
+            "calc" -> base.copy(query = text)
+            "joke" -> base.copy(query = if (tokens.any { it.norm.contains(n("חיד")) }) "riddle" else "")
             else -> base
         }
     }
@@ -114,12 +122,42 @@ class Understanding(private val classifier: IntentClassifier) {
         )
         private val SHE_WORDS = set(
             "אני", "צריך", "צריכה", "יש", "אין", "מחר", "היום", "אתמול", "הוא", "היא", "אנחנו", "הם", "לא", "כל",
-            "זה", "אתה",
+            "זה", "אתה", "אנחנו", "כבר", "הכל", "הכול", "את", "אני", "אחזור", "אגיע", "אאחר", "נפגש", "נדבר",
+            "יהיה", "אפשר", "תבוא", "תבואו", "תחזור", "תתקשר", "תקנה", "תביא", "הגעתי", "יצאתי", "אתם",
         )
         private val REMIND_LEAD = FILLER + set(
             "תזכיר", "תזכירי", "הזכר", "תזכורת", "תקבע", "קבע", "תגדיר", "להזכיר", "תוסיף", "חדשה", "remind",
             "me", "תזכרי", "ש", "על",
         )
+
+        private val WHATSAPP = set("וואטסאפ", "ווטסאפ", "וטסאפ", "וואצאפ", "ווצאפ", "whatsapp")
+        private val SMS_WORDS = set("בסמס", "בsms", "במסרון", "בהודעה", "בהודעת", "סמס", "sms", "מסרון")
+        private val MSG_LEAD = FILLER + set(
+            "תשלח", "שלח", "תשלחי", "לשלוח", "תכתוב", "תכתבי", "כתוב", "תגיד", "תודיע", "תעדכן", "הודעה", "הודעת",
+            "סמס", "sms", "מסרון", "חדשה", "אל",
+        )
+        private val CAL_LEAD = FILLER + set(
+            "תוסיף", "הוסף", "תוסיפי", "תכניס", "תרשום", "רשום", "תקבע", "תשים", "ליומן", "ביומן", "יומן", "אירוע",
+            "חדש", "צור", "תיצור", "ללוח", "השנה", "בלוח",
+        )
+        private val NOTIF_LEAD = FILLER + set(
+            "מה", "מי", "ההתראות", "התראות", "התראה", "תקריא", "תקריאי", "הקרא", "תראה", "תראי", "ההודעה",
+            "ההודעות", "הודעות", "הודעה", "האחרונה", "האחרונות", "אחרונות", "אחרונה", "החדשות", "חדשות", "יש",
+            "כתב", "כתבה", "כתבו", "שלח", "שלחה", "שלחו", "אמר", "אמרה", "הגיע", "הגיעו", "שלי", "של", "notifications",
+        )
+
+        /** "שהחנייה בקומה 3" -> "החנייה בקומה 3": drops the Hebrew "that" prefix from the first word. */
+        fun stripShe(tokens: List<Token>): List<Token> {
+            val rest = tokens.toMutableList()
+            if (rest.isEmpty()) return rest
+            val f = rest[0]
+            if (f.norm == "ש") rest.removeAt(0)
+            else if (f.norm.length > 2 && f.norm[0] == 'ש') {
+                val tail = f.norm.substring(1)
+                if (tail[0] == 'ה' || tail in SHE_WORDS) rest[0] = Token(f.display.substring(1), tail)
+            }
+            return rest
+        }
 
         fun join(t: List<Token>) = t.joinToString(" ") { it.display }.trim()
 

@@ -38,6 +38,24 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.foundation.layout.Arrangement
 import com.ozer.assistant.AssistantViewModel
 import com.ozer.assistant.speech.WhisperLib
+import com.ozer.assistant.actions.NotesApps
+import com.ozer.assistant.actions.Notifications
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import com.ozer.assistant.data.Routine
+import com.ozer.assistant.data.Store
 
 private class Perm(val title: String, val why: String, val granted: (Context) -> Boolean, val request: () -> Unit)
 
@@ -75,6 +93,9 @@ fun SettingsScreen(vm: AssistantViewModel, hebrewVoice: Boolean, resumeTick: Int
         add(Perm("שינוי הגדרות מערכת", "לשינוי בהירות", { Settings.System.canWrite(it) }) {
             open(Intent(Settings.ACTION_MANAGE_WRITE_SETTINGS, Uri.parse("package:" + ctx.packageName)))
         })
+        add(Perm("גישה להתראות", "כדי להקריא הודעות והתראות (נשארות רק בטלפון)", { Notifications.hasAccess(it) }) {
+            Notifications.openAccessSettings(ctx)
+        })
         add(Perm("נא לא להפריע", "למצב שקט ורטט", {
             (it.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).isNotificationPolicyAccessGranted
         }) { open(Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)) })
@@ -91,6 +112,12 @@ fun SettingsScreen(vm: AssistantViewModel, hebrewVoice: Boolean, resumeTick: Int
 
         HorizontalDivider(Modifier.padding(vertical = 12.dp))
         SpeechModelSection(vm)
+
+        HorizontalDivider(Modifier.padding(vertical = 12.dp))
+        NotesAppSection(store, resumeTick)
+
+        HorizontalDivider(Modifier.padding(vertical = 12.dp))
+        RoutinesSection(store)
 
         HorizontalDivider(Modifier.padding(vertical = 12.dp))
         Text("הרשאות", style = MaterialTheme.typography.titleMedium)
@@ -171,4 +198,90 @@ private fun SpeechModelSection(vm: AssistantViewModel) {
     if (message.isNotEmpty()) {
         Text(message, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 4.dp))
     }
+}
+
+@Composable
+private fun NotesAppSection(store: Store, resumeTick: Int) {
+    val ctx = LocalContext.current
+    val selected by store.notesApp.collectAsState()
+    val apps = remember(resumeTick) { NotesApps.installed(ctx) }
+    Text("איפה לשמור פתקים", style = MaterialTheme.typography.titleMedium)
+    Text("העוזר תמיד שומר עותק אצלו. אפשר לבחור שגם יפתח פתק באפליקציית הפתקים של הטלפון.",
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+    val options = listOf<Pair<String?, String>>(null to "רק בעוזר") + apps.map { it.packageName to it.label }
+    options.forEach { (pkg, label) ->
+        Row(
+            Modifier.fillMaxWidth().selectable(selected = selected == pkg, onClick = { store.setNotesApp(pkg) })
+                .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RadioButton(selected = selected == pkg, onClick = { store.setNotesApp(pkg) })
+            Text(label)
+        }
+    }
+    if (apps.isEmpty()) {
+        Text("לא נמצאה אפליקציית פתקים בטלפון.", style = MaterialTheme.typography.bodySmall)
+    }
+    Text("אפשר גם לציין בפקודה: \"תרשום פתק בקיפ לקנות ביצים\".",
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+}
+
+@Composable
+private fun RoutinesSection(store: Store) {
+    val routines by store.routines.collectAsState()
+    var editing by remember { mutableStateOf<Routine?>(null) }
+    var creating by remember { mutableStateOf(false) }
+
+    Text("שגרות (פקודות משלך)", style = MaterialTheme.typography.titleMedium)
+    Text("שם אחד שמפעיל כמה פקודות. למשל \"מצב לימוד\": מצב שקט, בהירות 40, פתח ספריא.",
+        style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline)
+    routines.forEach { r ->
+        Card(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
+                    Text(r.name, style = MaterialTheme.typography.bodyLarge)
+                    Text(r.commands.joinToString(" · "), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline)
+                }
+                IconButton(onClick = { editing = r }) { Icon(Icons.Filled.Edit, contentDescription = "עריכה") }
+                IconButton(onClick = { store.deleteRoutine(r.id) }) { Icon(Icons.Filled.Delete, contentDescription = "מחיקה") }
+            }
+        }
+    }
+    OutlinedButton(onClick = { creating = true }, modifier = Modifier.padding(top = 4.dp)) { Text("שגרה חדשה") }
+
+    val current = editing
+    if (creating || current != null) {
+        RoutineDialog(current, onDismiss = { creating = false; editing = null }) { name, cmds ->
+            store.saveRoutine(name, cmds, current?.id)
+            creating = false; editing = null
+        }
+    }
+}
+
+@Composable
+private fun RoutineDialog(initial: Routine?, onDismiss: () -> Unit, onSave: (String, List<String>) -> Unit) {
+    var name by remember { mutableStateOf(initial?.name ?: "") }
+    var commands by remember { mutableStateOf(initial?.commands?.joinToString("\n") ?: "") }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(if (initial == null) "שגרה חדשה" else "עריכת שגרה") },
+        text = {
+            Column {
+                OutlinedTextField(name, { name = it }, label = { Text("שם (מה תגיד)") }, singleLine = true,
+                    modifier = Modifier.fillMaxWidth())
+                Spacer(Modifier.height(8.dp))
+                OutlinedTextField(commands, { commands = it }, label = { Text("פקודות, אחת בכל שורה") },
+                    placeholder = { Text("מצב שקט\nבהירות 40\nפתח ספריא") }, minLines = 4,
+                    modifier = Modifier.fillMaxWidth())
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = name.isNotBlank() && commands.isNotBlank(),
+                onClick = { onSave(name, commands.lines()) },
+            ) { Text("שמירה") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("ביטול") } },
+    )
 }

@@ -35,3 +35,8 @@ greeting
 thanks
 help
 other
+message_send
+calendar_add
+notif_read
+calc
+joke

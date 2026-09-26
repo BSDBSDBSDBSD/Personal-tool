@@ -8,12 +8,18 @@ import android.view.KeyEvent
 import com.ozer.assistant.actions.ActionResult
 import com.ozer.assistant.actions.Apps
 import com.ozer.assistant.actions.DeviceControl
+import com.ozer.assistant.actions.Jokes
+import com.ozer.assistant.actions.Messaging
+import com.ozer.assistant.actions.NotesApps
+import com.ozer.assistant.actions.Notifications
 import com.ozer.assistant.actions.Music
 import com.ozer.assistant.actions.Phone
 import com.ozer.assistant.actions.Reminders
 import com.ozer.assistant.actions.Say
 import com.ozer.assistant.data.Store
+import com.ozer.assistant.nlu.Calculator
 import com.ozer.assistant.nlu.Command
+import com.ozer.assistant.nlu.Fuzzy
 import com.ozer.assistant.nlu.Features
 import com.ozer.assistant.nlu.IntentClassifier
 import com.ozer.assistant.nlu.Understanding
@@ -35,6 +41,11 @@ class Assistant(private val ctx: Context) {
     }
 
     fun handle(text: String): Reply {
+        findRoutine(text)?.let { return runRoutine(it) }
+        return handleCommand(text)
+    }
+
+    private fun handleCommand(text: String): Reply {
         val cmd = understanding.understand(text)
         var result = run(cmd, text)
         // If the classifier wasn't sure, but the whole sentence is simply an app's name, open it.
@@ -49,6 +60,33 @@ class Assistant(private val ctx: Context) {
         return Reply(result.text, result.permissions, debug, result.retry)
     }
 
+    // ---------- routines ----------
+    private val ROUTINE_WORDS = setOf("הפעל", "תפעיל", "תפעילי", "להפעיל", "שגרה", "שגרת", "תעשה", "בצע", "תבצע",
+        "מצב", "את", "בבקשה", "עוזר", "היי").map { Features.normalize(it) }.toSet()
+
+    private fun routineCore(s: String) = Features.normalize(s).split(' ').filter { it !in ROUTINE_WORDS }.joinToString(" ")
+
+    private fun findRoutine(text: String): com.ozer.assistant.data.Routine? {
+        val core = routineCore(text)
+        if (core.isEmpty()) return null
+        return store.routines.value.firstOrNull { r ->
+            val rc = routineCore(r.name)
+            rc.isNotEmpty() && (rc == core || (core.length >= 3 && Fuzzy.ratio(rc, core) >= 0.85))
+        }
+    }
+
+    private fun runRoutine(r: com.ozer.assistant.data.Routine): Reply {
+        val lines = ArrayList<String>()
+        val perms = LinkedHashSet<String>()
+        for (c in r.commands) {
+            val reply = try { handleCommand(c) } catch (e: Exception) { Reply("שגיאה: ${e.message}") }
+            lines += "• ${reply.text.lineSequence().first()}"
+            perms += reply.permissions
+        }
+        val body = if (lines.isEmpty()) "אין בה פקודות עדיין. אפשר להוסיף בלשונית הגדרות." else lines.joinToString("\n")
+        return Reply("מפעיל את \"${r.name}\":\n$body", perms.toList(), "routine", retry = false)
+    }
+
     private fun need(perm: String) = ctx.checkSelfPermission(perm) != PackageManager.PERMISSION_GRANTED
 
     private fun run(c: Command, raw: String): ActionResult = when (c.intent) {
@@ -58,10 +96,13 @@ class Assistant(private val ctx: Context) {
         "music_resume" -> { Music.mediaKey(ctx, KeyEvent.KEYCODE_MEDIA_PLAY); ActionResult("ממשיך לנגן.") }
         "music_next" -> { Music.mediaKey(ctx, KeyEvent.KEYCODE_MEDIA_NEXT); ActionResult("השיר הבא.") }
         "music_prev" -> { Music.mediaKey(ctx, KeyEvent.KEYCODE_MEDIA_PREVIOUS); ActionResult("השיר הקודם.") }
-        "note_add" -> {
-            if (c.query.isBlank()) ActionResult("מה לרשום? למשל: 'תרשום לקנות חלב'.")
-            else { store.addNote(c.query); ActionResult("רשמתי: ${c.query}") }
-        }
+        "note_add" -> addNote(c.query)
+        "message_send" -> Messaging.send(ctx, c.query, c.channel)
+        "calendar_add" -> Messaging.calendar(ctx, c.query, c.time)
+        "notif_read" -> Notifications.read(ctx, c.query, raw)
+        "calc" -> Calculator.evaluate(c.query)?.let { ActionResult("${it.expression} = ${Calculator.format(it.value)}") }
+            ?: ActionResult("לא הבנתי את התרגיל. למשל: 'כמה זה 15 כפול 7'.")
+        "joke" -> ActionResult(Jokes.next(ctx, riddle = c.query == "riddle"))
         "note_list" -> listNotes(c.query)
         "reminder_add" -> addReminder(c)
         "timer_set" -> Phone.timer(ctx, c.time?.durationSeconds)
@@ -141,6 +182,22 @@ class Assistant(private val ctx: Context) {
         return ActionResult("מנגן את ${song.title.ifBlank { song.fileName }}$who ב$player.")
     }
 
+    private fun addNote(query: String): ActionResult {
+        val target = NotesApps.resolve(ctx, query)
+        val text = target.text.trim()
+        if (text.isBlank()) return ActionResult("מה לרשום? למשל: 'תרשום לקנות חלב'.")
+        store.addNote(text)
+        val pkg = target.app?.packageName ?: store.notesApp.value
+            ?: if (target.generic) NotesApps.installed(ctx).firstOrNull()?.packageName else null
+        if (pkg == null) {
+            return ActionResult(if (target.generic) "רשמתי אצלי: $text\n(לא מצאתי אפליקציית פתקים בטלפון.)" else "רשמתי: $text")
+        }
+        val label = target.app?.label ?: NotesApps.installed(ctx).firstOrNull { it.packageName == pkg }?.label ?: "אפליקציית הפתקים"
+        return if (NotesApps.write(ctx, pkg, text)) {
+            ActionResult("פתחתי פתק חדש ב$label: \"$text\". אם צריך, לחץ שמירה. (שמרתי עותק גם אצלי.)")
+        } else ActionResult("רשמתי אצלי: $text\n($label לא קיבלה את הפתק.)")
+    }
+
     private fun listNotes(about: String): ActionResult {
         val all = store.notes.value
         if (all.isEmpty()) return ActionResult("אין לך עדיין פתקים. תגיד למשל 'תרשום לקנות חלב'.")
@@ -178,7 +235,12 @@ class Assistant(private val ctx: Context) {
             • תתקשר לאמא
             • תדליק פנס / תגביר ווליום / בהירות 50
             • מצב שקט / רטט / תדליק בלוטוס / מצב טיסה
+            • תשלח לאמא בוואטסאפ שאני מאחר
+            • תוסיף ליומן פגישה מחר בעשר
+            • מה ההודעה האחרונה בוואטסאפ?
+            • כמה זה 15 כפול 7? / ספר לי בדיחה / תן חידה
             • מה השעה? מה התאריך העברי? כמה סוללה?
+            • שגרות משלך (למשל "מצב לימוד") מגדירים בלשונית הגדרות
             לדבר בלי אינטרנט: צריך להתקין מודל Whisper בלשונית הגדרות.
         """.trimIndent()
     }

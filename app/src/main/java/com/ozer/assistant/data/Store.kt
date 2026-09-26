@@ -11,6 +11,9 @@ data class Note(val id: Long, val text: String, val created: Long)
 
 data class Reminder(val id: Long, val text: String, val at: Long, val fired: Boolean = false)
 
+/** A user-defined command: saying [name] runs every line of [commands]. */
+data class Routine(val id: Long, val name: String, val commands: List<String>)
+
 /** Tiny JSON-file storage for notes, reminders and settings. Everything stays on the phone. */
 class Store private constructor(private val dir: File) {
     private val notesFile = File(dir, "notes.json")
@@ -28,6 +31,14 @@ class Store private constructor(private val dir: File) {
 
     private val _showDebug = MutableStateFlow(loadPrefs().optBoolean("debug", false))
     val showDebug: StateFlow<Boolean> = _showDebug
+
+    /** Package of the phone's notes app to write notes into, or null to keep them only here. */
+    private val _notesApp = MutableStateFlow(loadPrefs().optString("notesApp", "").ifEmpty { null })
+    val notesApp: StateFlow<String?> = _notesApp
+
+    private val routinesFile = File(dir, "routines.json")
+    private val _routines = MutableStateFlow(loadRoutines())
+    val routines: StateFlow<List<Routine>> = _routines
 
     private fun newId() = System.currentTimeMillis() * 1000 + (0..999).random()
 
@@ -88,6 +99,30 @@ class Store private constructor(private val dir: File) {
     // ---------- prefs ----------
     fun setSpeak(v: Boolean) { _speak.value = v; savePrefs() }
     fun setShowDebug(v: Boolean) { _showDebug.value = v; savePrefs() }
+    fun setNotesApp(pkg: String?) { _notesApp.value = pkg; savePrefs() }
+
+    // ---------- routines ----------
+    @Synchronized
+    fun saveRoutine(name: String, commands: List<String>, id: Long? = null) {
+        val r = Routine(id ?: newId(), name.trim(), commands.map { it.trim() }.filter { it.isNotEmpty() })
+        _routines.value = _routines.value.filterNot { it.id == r.id } + r
+        saveRoutines()
+    }
+
+    @Synchronized
+    fun deleteRoutine(id: Long) {
+        _routines.value = _routines.value.filterNot { it.id == id }
+        saveRoutines()
+    }
+
+    private fun loadRoutines(): List<Routine> = readArray(routinesFile).map { o ->
+        val a = o.getJSONArray("commands")
+        Routine(o.getLong("id"), o.getString("name"), (0 until a.length()).map { a.getString(it) })
+    }
+
+    private fun saveRoutines() = writeArray(routinesFile, _routines.value.map { r ->
+        JSONObject().put("id", r.id).put("name", r.name).put("commands", JSONArray().also { a -> r.commands.forEach { a.put(it) } })
+    })
 
     private fun loadPrefs(): JSONObject = try {
         if (prefsFile.exists()) JSONObject(prefsFile.readText()) else JSONObject()
@@ -95,7 +130,8 @@ class Store private constructor(private val dir: File) {
 
     @Synchronized
     private fun savePrefs() = atomicWrite(prefsFile,
-        JSONObject().put("speak", _speak.value).put("debug", _showDebug.value).toString())
+        JSONObject().put("speak", _speak.value).put("debug", _showDebug.value)
+            .put("notesApp", _notesApp.value ?: "").toString())
 
     // ---------- io ----------
     private fun readArray(f: File): List<JSONObject> = try {
