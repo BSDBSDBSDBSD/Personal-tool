@@ -51,7 +51,7 @@ jobs:
           # Offline speech models (whisper.cpp), attached so everything downloads from one page.
           HF=https://huggingface.co/ggerganov/whisper.cpp/resolve/main
           MODELS=""
-          for m in ggml-small-q5_1.bin ggml-base-q5_1.bin; do
+          for m in ggml-small-q5_1.bin ggml-base-q5_1.bin ggml-small.bin; do
             if curl -fsSL --retry 3 -o "$m" "$HF/$m"; then MODELS="$MODELS $m"; ls -l "$m"; else echo "::warning::could not download $m"; fi
           done
           gh release delete latest -y --cleanup-tag || true

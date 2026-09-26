@@ -152,7 +152,7 @@ private fun SpeechModelSection(vm: AssistantViewModel) {
     )
     Text(
         "איך מתקינים: מורידים את הקובץ ggml-small-q5_1.bin (מומלץ, כ-190 מגה) או ggml-base-q5_1.bin " +
-            "(קטן ומהיר יותר, פחות מדויק) במחשב, מעתיקים לטלפון (כבל או כרטיס זיכרון), ובוחרים אותו כאן.",
+            "(קטן ומהיר יותר, פחות מדויק), או ggml-small.bin (כ-470 מגה, בלי דחיסה, כבד יותר) במחשב, מעתיקים לטלפון (כבל או כרטיס זיכרון), ובוחרים אותו כאן.",
         style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.outline,
         modifier = Modifier.padding(vertical = 4.dp),
     )
