@@ -1,0 +1,119 @@
+open_app	תפתח לי את הווטסאפ
+open_app	פתח יוטיוב
+open_app	תיכנס לוויז בבקשה
+open_app	תפתח את המצלמה
+open_app	תפתחי את מוסיקולט
+open_app	תכנס לגוגל
+open_app	תפעיל את אפליקציית מוביט
+open_app	פתח מחשבון
+open_app	תפתח את הגלריה שלי
+open_app	אפשר לפתוח טלגרם
+open_app	תפתח את ספריא
+open_app	תעלה לי את היומן
+play_song	תנגן את אדון עולם
+play_song	תשמיע לי את השיר תודה של ישי ריבו
+play_song	שים את ירושלים של זהב במוסיקולט
+play_song	תפתח את השיר לכה דודי
+play_song	תנגן משהו של מרדכי בן דוד
+play_song	אני רוצה לשמוע את אבינו מלכנו
+play_song	תפעיל את השיר הלב שלי
+play_song	נגן ניגון של חב"ד
+play_song	תשים את השיר אני מאמין במוזיקולט
+play_song	תשמיע ידיד נפש
+music_pause	תעצור את המוזיקה
+music_pause	עצור
+music_pause	תפסיק לנגן
+music_resume	תמשיך לנגן
+music_resume	תמשיך את השיר
+music_next	השיר הבא
+music_next	תעביר שיר
+music_next	דלג
+music_prev	תחזור לשיר הקודם
+music_prev	הקודם בבקשה
+note_add	תרשום לקנות חלב וביצים
+note_add	תכתוב פתק שהפגישה נדחתה ליום ראשון
+note_add	פתק חדש: להתקשר לשרברב
+note_add	תזכור שהחנייה בקומה שלוש
+note_add	תרשום לי את המספר 0501234567
+note_add	תוסיף פתק לקנות מתנה לאבא
+note_list	תראה לי את הפתקים
+note_list	מה רשמתי
+note_list	תקריא את הפתקים שלי
+note_list	מה רשמתי על החנייה
+reminder_add	תזכיר לי מחר בשמונה להתקשר לבנק
+reminder_add	תזכיר לי בעוד חצי שעה להוציא את העוגה
+reminder_add	תזכורת ביום שישי בעשר לקנות חלות
+reminder_add	תזכיר לי להתפלל ערבית בשבע וחצי
+reminder_add	תעשה לי תזכורת לקחת כדור בעוד שעתיים
+timer_set	טיימר לעשר דקות
+timer_set	תפעיל טיימר של חמש דקות
+timer_set	תשים טיימר לחצי שעה
+timer_set	טיימר 3 דקות
+alarm_set	תעיר אותי מחר בשש וחצי
+alarm_set	שעון מעורר לשבע
+alarm_set	תכוון שעון מעורר ל-5:45
+alarm_set	תעיר אותי בחמש בבוקר
+call_contact	תתקשר לאמא
+call_contact	חייג לאבא
+call_contact	תתקשר ליוסי כהן
+call_contact	תוציא שיחה לרב
+call_contact	תתקשרי לסבתא
+flashlight_on	תדליק פנס
+flashlight_on	תדליק את הפנס
+flashlight_on	פנס
+flashlight_off	תכבה את הפנס
+flashlight_off	כבה פנס
+wifi_on	תדליק וויפי
+wifi_on	תפעיל את הוויפי
+wifi_off	תכבה את הוויפי
+bluetooth_on	תדליק בלוטוס
+bluetooth_on	תפעיל בלוטוס
+bluetooth_off	תכבה בלוטוס
+volume_up	תגביר את הווליום
+volume_up	יותר חזק
+volume_up	תעלה את העוצמה
+volume_down	תנמיך
+volume_down	תוריד את הווליום קצת
+volume_down	יותר חלש
+volume_set	ווליום על 50
+volume_set	תשים עוצמה על 30 אחוז
+volume_mute	תשתיק
+volume_mute	השתק את הקול
+brightness_up	תגביר בהירות
+brightness_up	תעלה את הבהירות
+brightness_down	תוריד בהירות
+brightness_down	המסך בהיר מדי
+brightness_set	בהירות 70
+brightness_set	תשים בהירות על חמישים
+brightness_auto	בהירות אוטומטית
+dnd_on	תעביר למצב שקט
+dnd_on	נא לא להפריע
+dnd_on	מצב שבת
+dnd_off	תבטל מצב שקט
+dnd_off	תחזיר את הצלצול
+vibrate_mode	מצב רטט
+vibrate_mode	תשים על רטט
+open_settings	תפתח הגדרות
+open_settings	תפתח הגדרות בלוטוס
+open_settings	מצב טיסה
+open_settings	תדליק מיקום
+open_settings	תפתח הגדרות סוללה
+time_query	מה השעה
+time_query	כמה השעה עכשיו
+date_query	מה התאריך היום
+date_query	מה התאריך העברי
+date_query	איזה יום היום
+battery_query	כמה סוללה נשארה
+battery_query	כמה אחוז יש לי
+greeting	שלום
+greeting	בוקר טוב
+greeting	מה נשמע
+thanks	תודה רבה
+thanks	יישר כח
+help	מה אתה יודע לעשות
+help	עזרה
+other	ספר לי בדיחה
+other	מה הבירה של צרפת
+other	אני רעב
+other	איפה המפתחות שלי
+other	מה מזג האוויר מחר
